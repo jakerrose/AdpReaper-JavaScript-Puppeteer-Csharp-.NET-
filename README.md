@@ -5,20 +5,15 @@ This is a solution that was used as part of my job as Software Developer for an 
 I was tasked with collected documents and data of all employees, past and present, including training materials, I9 forms, W2's, 1095-C's, benefit enrollment history, pay history, and position history. 
 
 This solution runs in Visual Studio 2022 in a .NET framework (8.0). The main programming language is C# and uses JavaScript and the JavaScript library PuppeteerSharp. When the application is run, the Run() function 
-is called which calls the app.config settings and launches the Puppeteer browser and all its settings. From the Task GetBrowser you can change the browser and helpful settings like kiosk-printing which controls what 
+is called which calls the app.config settings and launches the Puppeteer browser and all its settings. From the task GetBrowser you can change the browser and helpful settings like kiosk-printing which controls what 
 happens when the print button is clicked in the browser. Using the app.config settings, the browser launches the specified starting url and types in the username and password and clicks the login button with Puppeteer. 
-In the first try catch are the Tasks that one can select to run. If one is uncommented, it will just run that one, or else it will loop back around once the Task is complete and start the next.
+In the first try catch are the Tasks that one can select to run. If one is uncommented, it will just run that one, or else it will loop back around once the task is complete and start the next.
 
 ## employeeFetch()
-The purpose of this task is go create a JSON file of a list of all employees in the company. This information is found as an XHR fetch in the browsers' API upon loading of a page. By copying the fetch, I created this 
-JavaScript fetch call. This will save a file with all employee information that the system uses including name, multiple id numbers, status, hire date, and much more. There is associate view which just has information
-about an employee's current position and position view which has all historical positions. Whenever this data is needed for the rest of the solution, it can be called and loaded into the class EmployeeSearchResponse.cs.
-The static async void LoadEmps() can be called before the Task is called the deserialize the JSON into the list EmployeeRecordADP so that the data is already ready to use.
+The purpose of this task is go create a JSON file of a list of all employees in the company. This information is found as a network XHR fetch in the browsers' API upon loading of a certain page. By copying the fetch, I created this  JavaScript fetch call. This will save a file with all employee information that the system uses including name, multiple id numbers, status, hire date, and much more. There is associate view which just has information about an employee's current position and position view which has all historical positions. Whenever this data is needed for the rest of the solution, it can be called and loaded into the class EmployeeSearchResponse.cs. The static async void LoadEmps() can be called before the task is called t0 deserialize the JSON into the list EmployeeRecordADP so that the data is already ready to use.
 
 ## GetLMSPdf()
-This collection was to get training documents for employees from a very old LMS system that did not use any API fetches. I had to rely on scraping the DOM from HTML to get the data I was after and to collect the needed 
-documents. The system was designed as a series of folders, some containing links to download documents, others just more folders. I used this JavaScript to evaluation the HTML and find the links I was after. If one was 
-found, it would be stored in a JSON file:
+This collection is to get training documents for employees from a very old LMS system that did not use any API fetches. I had to rely on scraping the DOM to get the data I was after and to collect the needed  documents. The system was designed as a series of folders, some containing links to download documents, others just more folders. I used this JavaScript to evaluation the HTML and find the links I was after. If one was found, it would be stored in a JSON file:
 
     var script = @"
             Array.from(document.querySelectorAll('a[href^=""/lms/servlet/lms/FRFILE?RID""]'))
@@ -28,7 +23,8 @@ found, it would be stored in a JSON file:
 
 
 If no links to documents were found, the link to the next layer of folders would be saved. Since there was up to four layers of folders in these structures, I repeated my loop four times to save JSON files of download
-and folder links four layers deep. After that, I could look for files. The links to the files in the DOM had the url and the filename and I wanted both so I used this JavaScript:
+and folder links four layers deep. After that, I could look for files. This C# code uses Puppeteer to evaluate JavaScript code in a web page context and extract information from certain elements. I store the filenames 
+and links into pairs to use later:
 
 			// Get all path and filename pairs from the page
 			var pairs = await page.EvaluateFunctionAsync<List<Dictionary<string, string>>>(@"
@@ -49,7 +45,8 @@ and folder links four layers deep. After that, I could look for files. The links
     ");
 
     
-For each pair, I could now use the pathValue to define the URL of the file and download with this code:
+For each pair, I could now use the pathValue to define the URL of the file and download with this code. Here I use JavaScript to fetch the file from the url, then convert the http response into a blob.
+The onloadend event fires when the reading is complete, and it resolves the promise with the Base64 string:
 
     var downloadUrl = $"https://tms.adp.com{pathValue}";
     
@@ -64,6 +61,66 @@ For each pair, I could now use the pathValue to define the URL of the file and d
             reader.readAsDataURL(blob);
         });
     }", downloadUrl);
+
+The scraped data is used to name the pdf file and save to the chosen output folder.
+
+## getEnrollmentHistory()
+This method is a simple example of a process automation script using Puppeteer. The variable page is established as the Puppeteer controlled browser page and downloadPath is established as the default path for
+the pdf that is downloaded. In this system, the pdf always has the same name when downloaded. The GoToAsync() function is used to browse to a url. We define the button we want to click on to view the appropriate page by using QuerySelectorAsync() on the css selector. A timeout is called to give Puppeteer more time to locate the selector. ClickAsync() is used to simulate clicking on the selector.
+
+We have already loaded the employee JSON file into our class and can loop through each. We have collected the employee JSON from a fetch in the same system we're working in so they are listed in the same order as in the UI. That way, we can end our loop by simulating clicking to the next employee in the UI and they will match up. When the loop begins, we set up the naming of the file using the employee name and old file number from our list as well as a separate JSON list called the crosswalk which contains the employee's new ID number. If the old number matches the new number, that employee is also assigned a new ID, or else "0000":
+		
+		CrosswalkEmp paycomPerson = CrosswalkEmps.FirstOrDefault(person => person.ClockSeq == emp.positions[0].fileNumber);
+		var paycomId = "";
+		if (paycomPerson != null)
+				paycomId = paycomPerson.Employee_Code;
+		else
+				paycomId = "0000";
+A variable for the print button is established, then clicked, causing a pdf to be downloaded into our downloadPath. There is then a check to see if that file exists in the downloadPath. If it does, it is renamed to 
+our convention and moved to another folder. A click to the next page and our loop restarts.
+
+## getI9emps() and getI9info()
+
+This collection worked with a different part of the ADP website that was also less than modern technology. My task was to go to the I9 section of the site, select each employee's page, then get screenshots of multiple tabs. My first step was to get a network fetch from that specific page to create a new JSON file of those employees listed. This was needed in order to identify each employee in order to name correctly, which I'll get to. 
+There were four categories of employees, active and closed and I simply wrote a loop for eaach and established the number of employees for each and commented out the others (this repo only shows two). I went to the correct tab manually, established a GoToAsync() at the beginning of the loop to refresh the page, and set up the viewport for screenshots. Each tab was a long list of employee names. I set up the nameLink selector which uses css and the index of the loop to click on the current employee: 
+
+		var nameLink = await page.QuerySelectorAsync($"#EI9_DASHBOARD_GRID_{i} > div > div > div > div.vdl-col-xs.ei9-grid-cell.mdf-d-table > a");
+
+Before an employee link is clicked, I must create an event listener that will fetch certain data from the network. I target the url to listen for on a click event. If that url is detected, it will load the network response in JSON form into my class I9Root which is derived from my getI9emps() function. The employee's information is deserialized and loaded and then the value for social security number is looped and compared with ssn's from my regular employee list. When a match is found, I can then identify the employee we are working with and complete the naming conventions. Event listener code:
+
+		string targeturl = "https://workforcenow.adp.com/mascsr/wfn/compliance/metaservices/ei9/ei9Data/retrieveFormData";
+
+		//Create request listener to log request for troubleshooting
+		EventHandler<RequestEventArgs> requestHandler = (sender, e) =>
+		{
+						if (e.Request.Url.Contains(targeturl))
+						{
+							Console.WriteLine($"Request: {e.Request.Url}");
+						}
+		};
+		
+		//Create response listener to capture response body from checkstubslight request
+		EventHandler<ResponseCreatedEventArgs> responseHandler = async (sender, e) =>
+		{
+						if (e.Response.Url.Contains(targeturl))
+						{
+							Console.WriteLine($"Response: {e.Response.Url} Status: {e.Response.Status}");
+							string responseBody = await e.Response.TextAsync();
+							//datalist = JsonConvert.DeserializeObject<List<Root>>(responseBody);
+							datalist = JsonConvert.DeserializeObject<I9Root>(responseBody);
+						}
+		
+		};
+
+  The ClickAsync() on nameLink triggers the listener. If nameLink can't be found in the if else statement, a page down action in Puppeteer is triggered to scroll farther down the page. On the employee's page, each tab is screenshotted and given a descriptive name. 
+		
+		
+
+
+
+
+
+    
 
 
 
