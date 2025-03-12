@@ -10,7 +10,35 @@ happens when the print button is clicked in the browser. Using the app.config se
 In the first try catch are the Tasks that one can select to run. If one is uncommented, it will just run that one, or else it will loop back around once the task is complete and start the next.
 
 ## employeeFetch()
-The purpose of this task is go create a JSON file of a list of all employees in the company. This information is found as a network XHR fetch in the browsers' API upon loading of a certain page. By copying the fetch, I created this  JavaScript fetch call. This will save a file with all employee information that the system uses including name, multiple id numbers, status, hire date, and much more. There is associate view which just has information about an employee's current position and position view which has all historical positions. Whenever this data is needed for the rest of the solution, it can be called and loaded into the class EmployeeSearchResponse.cs. The static async void LoadEmps() can be called before the task is called t0 deserialize the JSON into the list EmployeeRecordADP so that the data is already ready to use.
+The purpose of this task is go create a JSON file of a list of all employees in the company. This information is found as a network XHR fetch in the browsers' API upon loading of a certain page. By copying the fetch, I created this  JavaScript fetch call. This will save a file with all employee information that the system uses including name, multiple id numbers, status, hire date, and much more. There is associate view which just has information about an employee's current position and position view which has all historical positions. Whenever this data is needed for the rest of the solution, it can be called and loaded into the class EmployeeSearchResponse.cs. I use this JavaScript fetch call in a C# string that is requested to the HTTP of the browser through Puppeteer. This is a POST request with filters such as number of results, sorting prefernces, etc. The response is a JSON payload that is converted with C# into a JSON list file. The static async void LoadEmps() can be called before the next task to deserialize the JSON into the list EmployeeRecordADP so that the data is already ready to use to loop through employees, define variables, and more.
+		
+		//positionView
+					var employeePosFetch = $"fetch('https://workforcenow.adp.com/mascsr/wfn/employeeidbar/metaservices/wfn/mobility/rest/hr/v2/employeeList?revealTaxId=true',\n" +
+									"{" +
+									"  'headers': {\n" +
+									"    'accept': 'application/json',\n" +
+									"    'accept-language': 'en-US,en;q=0.9',\n" +
+									"    'cache-control': 'no-cache',\n" +
+									"    'content-type': 'application/json',\n" +
+									"    'pragma': 'no-cache',\n" +
+									"    'sec-fetch-dest': 'empty',\n" +
+									"    'sec-fetch-mode': 'cors',\n" +
+									"    'sec-fetch-site': 'same-origin'\n" +
+									"  },\n" +
+									$"  'referrer': 'https://workforcenow.adp.com/theme/admin.html',\n" +
+									"   'referrerPolicy': 'strict-origin-when-cross-origin',\n" +
+									"    'body': \"{'preferences':{'positionView':true,'displayedPositionId':true,'companyView':'A','currentCompanyCode':'9200284510354','searchEffectiveDate':'T','isIncludeIndirectReportsAvailable':false,'includeIndirectReports':false}," +
+														"'role':'practitioner','startIndex':1, 'endIndex':99999,'filterOid':'1:9001','loadOtherPositions':false,'sortingColumn':' last_name, first_name ','sortingDirection':' asc '}\", \n" +
+									"    'method': 'POST',\n" +
+									"    'mode': 'cors',\n" +
+									"    'credentials': 'include'\n" +
+									"})\n" +
+									".then(x => x.json())\n" +
+									".then(x => { return JSON.stringify(x, null, 5); });";
+		
+					var employeePosJson = await page.EvaluateExpressionAsync<string>(employeePosFetch);
+					var exportPosPath = System.IO.Path.Combine(outputDirectory, "ADP GC empsX Pos View.json");
+					System.IO.File.WriteAllText(exportPosPath, employeePosJson);
 
 ## GetLMSPdf()
 This collection is to get training documents for employees from a very old LMS system that did not use any API fetches. I had to rely on scraping the DOM to get the data I was after and to collect the needed  documents. The system was designed as a series of folders, some containing links to download documents, others just more folders. I used this JavaScript to evaluation the HTML and find the links I was after. If one was found, it would be stored in a JSON file:
