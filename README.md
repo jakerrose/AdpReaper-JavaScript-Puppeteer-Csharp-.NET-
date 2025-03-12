@@ -110,6 +110,7 @@ our convention and moved to another folder. A click to the next page and our loo
 ## getI9emps() and getI9info()
 
 This collection worked with a different part of the ADP website that was also less than modern technology. My task was to go to the I9 section of the site, select each employee's page, then get screenshots of multiple tabs. My first step was to get a network fetch from that specific page to create a new JSON file of those employees listed. This was needed in order to identify each employee in order to name correctly, which I'll get to. 
+
 There were four categories of employees, active and closed and I simply wrote a loop for eaach and established the number of employees for each and commented out the others (this repo only shows two). I went to the correct tab manually, established a GoToAsync() at the beginning of the loop to refresh the page, and set up the viewport for screenshots. Each tab was a long list of employee names. I set up the nameLink selector which uses css and the index of the loop to click on the current employee: 
 
 		var nameLink = await page.QuerySelectorAsync($"#EI9_DASHBOARD_GRID_{i} > div > div > div > div.vdl-col-xs.ei9-grid-cell.mdf-d-table > a");
@@ -140,16 +141,48 @@ Before an employee link is clicked, I must create an event listener that will fe
 		
 		};
 
-  The ClickAsync() on nameLink triggers the listener. If nameLink can't be found in the if else statement, a page down action in Puppeteer is triggered to scroll farther down the page. On the employee's page, each tab is screenshotted and given a descriptive name. 
+  The ClickAsync() on nameLink triggers the listener. If nameLink can't be found in the if else statement, a page down action in Puppeteer is triggered to scroll farther down the page. On the employee's page, each tab is screenshotted and given a descriptive name.
+
+## PayHistoryHtml()
+
+While the goal is usually to collect original documents, sometimes it is necessary to recreate documents from data within the JSON files. This is usually if it is much quicker to download the smaller JSON files instead of downloading PDFs or doing screenshots and will help us meet a deadline. In the case of this solution, another developer collected the JSON files with data about employees' pay history. This C# code constructs an HTML string using embedded CSS styles for layout grids.
+
+The JSON files are named such that some of the information we need is already in the filename. We can split the filename by parts at the underscore into an array and construct variables for each part. Our top loop uses each JSON file and a nested foreach loop matches the position id from the filename with the positionId variable in our employee class to match the correct employee. Once we have loaded the employee's data into our employee class, we can pull data from the employee class as well as the PayRateHistoryADP class, which contains information about the employee's salary. 
+
+The HTML and CSS is written to match the style of the downloaded document. This template works for each JSON file in the loop and extracts employee and salary information from the classes and loads into the HTML string. At the end of the loop, the HTML string is written to an HTML file and named using System.IO.WriteAllText()
+
+					for (int h = 0; h < p.futureList.Length; h++)
+					{
+						sHtmlOut = sHtmlOut + $"<table width=100% style='border:0px solid black;font-size:12px; font:Tahoma;'>\r\n"
+														+ $"<tr width='100%'>\r\n"
+															+ $"<td align='left' style='width:10%;'>{p.futureList[h].Salary.key.effDate}</td>\r\n"
+															+ $"<td align='left' style='width:15%;'>{p.futureList[h].Salary.IncreaseType.code}&nbsp;-&nbsp;{p.futureList[h].Salary.IncreaseType.description}</td>\r\n"
+															+ $"<td align='left' style='width:10%;'>{(p.futureList[h].Salary.RateType != null ? (p.futureList[h].Salary.RateType.code == "S" ? "Salary" : "Hourly") : "")}</td>\r\n"
+															+ $"<td align='right' style='width:10%;'>{p.futureList[h].Salary.Rate1Amount}&nbsp;-&nbsp;{p.futureList[h].Salary.Rate1CurrencyCode}</td>\r\n"
+															+ $"<td align='right' style='width:10%;'>{p.futureList[h].Salary.Rate2Amount}&nbsp;-&nbsp;{p.futureList[h].Salary.Rate2CurrencyCode}</td>\r\n"
+															//+ $"<td align='left' style='width:10%;'>{(p.futureList[h].Salary.PayFreqType.code == "B" ? "Biweekly" : "Monthly")}</td>\r\n"
+															+ $"<td align='left' style='width:10%;'>{(p.futureList[h].Salary.PayFreqType?.code == "B" ? "Biweekly" : (p.futureList[h].Salary.PayFreqType?.code == null ? "&nbsp;" : "Monthly"))}</td>\r\n"
+															+ $"<td align='right' style='width:6%;'>{p.futureList[h].Salary.StandardHours.ToString()}</td>\r\n"
+															+ $"<td align='right' style='width:15%;'>{p.futureList[h].Salary.AnnualSalaryAmount}</td>\r\n"
+															+ $"<td align='right' style='width:14%;'>{p.futureList[h].Salary.dollarChange}&nbsp;-&nbsp;{p.futureList[h].Salary.percentChange.ToString()}%</td>\r\n"
+														+ $"</tr>\r\n"
+														+ $"<tr><td>&nbsp;</td></tr>\r\n"
+													+ $"</table>\r\n";
+					}
+				}
+	}
+			//sHtmlOut = sHtmlOut + $"</table>\r\n<br />";
+			sHtmlOut = sHtmlOut + $"</body></html>";
 		
+		string fullPath = System.IO.Path.Combine(outputDirectory, newFileName);
+		// Check if file exists, and rename if necessary
+		int counter = 1;
+		while (System.IO.File.Exists(fullPath))
+		{
+						newFileName = $"{baseFileName}_{counter}{extention}";
+						fullPath = System.IO.Path.Combine(outputDirectory, newFileName);
+						counter++;
+		}
 		
-
-
-
-
-
-    
-
-
-
-
+		// Write the HTML content to the file
+		System.IO.File.WriteAllText(fullPath, sHtmlOut);
